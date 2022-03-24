@@ -1,7 +1,7 @@
 # GD Demon Ladder Discord bot
 # Written by RFMX, (c) 2021-2022
 
-# ver 1.1.5b
+# ver 1.2-beta1
 
 """
 This bot is written to make searching for demons easier in server.
@@ -15,9 +15,19 @@ g!bean: Beans
 g!level: Information about a level. Input is the ID.
 g!need: Gives 5 random demons of the same tier. Input is the required tier.
 g!ping: Pings.
-g!help: Shows info about commands.
 g!rating: Submits ratings.
+g!enjoy: Submits ratings for enjoyment.
 g!user: Shows ratings submitted by a user.
+g!help: Shows info about commands.
+"""
+
+"""
+TODO:
+[DONE] g!level: Change to show the submitted ratings in pages
+g!level: Change the fun section to fetch from a JSON file
+g!level, g!user, g!need(?): Add enjoyment components.
+g!rating, g!enjoy: Change the format to simplify the command
+Find out why it sends too many requests
 """
 
 # ** Setup **
@@ -81,6 +91,43 @@ prompts_u = (
 
 # ** Commands **
 
+# * G!BEAN: Beans. *
+@client.command()
+async def bean(ctx, person, *reason):
+    print('ladder> Executing command __bean__ in {0}, {1} initiated by {2}'.
+          format(ctx.channel, ctx.guild, ctx.author))
+    if "!" in person: personid = person[3:-1]
+    else: personid = person[2:-1]
+    print(personid)
+    try:
+        person_user = await client.fetch_user(personid)
+    except:
+        if "#" in person:
+            person_tag = person.split("#", 1)
+            person_user = discord.utils.get(client.get_all_members(), name=person_tag[0], discriminator=person_tag[1])
+        else:
+            person_user = discord.utils.get(client.get_all_members(), name=person)
+    if person_user != None:
+        if len(reason) == 0: reasontext = "No reason given."
+        else: reasontext = ' '.join(reason)
+        await ctx.channel.send(
+            "<:yes_tick:744780635641610240> {0}#{1} (`{2}`) was beaned. Reason: `{3}`"
+            .format(person_user.name, person_user.discriminator,
+                    person_user.id, reasontext))
+    elif person == "everyone":
+        await ctx.channel.send("I too wish to give beans to everyone.")
+    else:
+        await ctx.channel.send("No user found for `{0}`!".format(person))
+    print('ladder> Bean successful. Waiting for person to send message in an hour.')
+    
+    def check(msg):
+        return (msg.author == person_user)
+
+    emoji = discord.utils.get(client.emojis, name='mrbean')
+    msg = await client.wait_for('message', timeout=3600.0, check=check)
+    await msg.add_reaction(emoji)
+        
+    print('ladder> Command execution complete.')
 
 # * G!LEVEL: this receives a level ID then spits data about it *
 @client.command()
@@ -89,6 +136,7 @@ async def level(ctx, id_search):
           format(ctx.channel, ctx.guild, ctx.author))  # prompt in console
 
     # * HTTP requests
+    responsemsg = await ctx.channel.send(content="Processing...")
     global apikey
     url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'The List'!E:E?key=" + apikey # URL construction
     print('ladder> Requesting to Google sheets for data at Column E.')
@@ -130,15 +178,12 @@ async def level(ctx, id_search):
                 if r_json[5] != "unrated":
                     tier = r_json[5]
                     tier2dp = r_json[6]
-                    ratings = ''
+                    ratings = []
                     i = 7
                     try:
                         while r_json[i] != '':
-                            ratings = ''.join([ratings, '- Tier ', r_json[i]])
-                            i = i + 1
-                            ratings = ''.join([ratings, ' by ', r_json[i]])
-                            i = i + 1
-                            ratings = ''.join([ratings, '\n'])
+                            ratings.append([r_json[i], r_json[i+1]])
+                            i += 2
                     except:
                         pass
                 else:
@@ -151,6 +196,13 @@ async def level(ctx, id_search):
             embed = discord.Embed(title="Level information of {0} ({1})".format(name, id_search), url=gdbrowser_url, color=tierhex[int(tier)])
         else:            
             embed = discord.Embed(title="Level information of {0} ({1})".format(name, id_search), url=gdbrowser_url, color=tierhex[0])
+
+        # Fun section, TODO rewrite this section so that this obtains info from an external file
+        if id_search == "60660086":
+            embed.set_footer(text="- Tier what the fuck do you mean multition 6")
+        elif id_search == "76074130":
+            embed.set_footer(text="i too love consuming vast amounts of chlorine!")
+        
         embed.add_field(name="Creator", value=creator, inline=True)
         embed.add_field(name="Song", value=song, inline=True)
         embed.add_field(name="Official Difficulty",
@@ -163,30 +215,68 @@ async def level(ctx, id_search):
         else:
             embed.add_field(name="Tier", value="Unrated", inline=False)
         if ratings != None:
-            embed.add_field(name="Submitted ratings",
-                            value=ratings,
-                            inline=True)
+            loop = True
+            if len(ratings) > 10:
+                totalpages = int(math.ceil(len(ratings) / 10))
+                page = 0
+                await responsemsg.add_reaction("⬅️")
+                await responsemsg.add_reaction("➡️")
+                while loop:
+                    if len(ratings) < 10 * (page + 1):
+                        display_range = range(10 * page, len(ratings))
+                    else:
+                        display_range = range(10 * page, 10 * (page + 1))
+                    ratingtext = ""
+                    for i in display_range:
+                        ratingtext = "".join([ratingtext, "- Tier {0} by {1}\n".format(ratings[i][0], ratings[i][1])])
+                    embed.add_field(name="Submitted ratings (Page {0} of {1})".format(page + 1, totalpages),
+                                value=ratingtext,
+                                inline=True)
+                    await responsemsg.edit(content="", embed=embed)
+                    print(
+                        "ladder> Command execution complete with samples generated. Printed Page {0}. Awaiting further response."
+                        .format((page + 1)))
+
+                    def check(reaction, user):
+                        return (user == ctx.author and (str(reaction.emoji) == "⬅️" or str(reaction.emoji) == "➡️"))
+
+                    try:
+                        reaction, user = await client.wait_for(
+                            'reaction_add', timeout=60.0, check=check)
+                        print(reaction)
+                        embed.remove_field(-1)
+                        if reaction.emoji == "⬅️" and page > 0:
+                            page -= 1
+                        elif reaction.emoji == "➡️" and page < (
+                                totalpages - 1):
+                            page += 1
+                    except asyncio.TimeoutError:
+                        loop = False
+                        print("ladder> Timeout.")
+                    try:
+                        await responsemsg.remove_reaction("⬅️", ctx.author)
+                    except:
+                        pass
+                    try:
+                        await responsemsg.remove_reaction("➡️", ctx.author)
+                    except:
+                        pass
+            else:
+                ratingtext = ""
+                for i in ratings:
+                    ratingtext = "".join([ratingtext, "- Tier {0} by {1}\n".format(i[0], i[1])])
+                embed.add_field(name="Submitted ratings",
+                                value=ratingtext,
+                                inline=True)
+                await responsemsg.edit(content="",embed=embed)
+        else:
+            await responsemsg.edit(content="",embed=embed)
     else:
         embed = discord.Embed(title="There is no demon with the ID {0}!".format(id_search), \
         color=0xED4337)
-    # Fun section, TODO rewrite this section so that this obtains info from an external file
-    if id_search == "60660086":
-        embed.set_footer(text="- Tier what the fuck do you mean multition 6")
-    elif id_search == "76074130":
-        embed.set_footer(text="i too love consuming vast amounts of chlorine!")
-    await ctx.channel.send(embed=embed)
+        await responsemsg.edit(content="",embed=embed)
+
     print('ladder> Command execution complete.')
-
-
-# * G!STATUS: Administrator only, change the status of the bot *
-# this is just for legacy purposes, now the bot does it automatically
-@client.command()
-@commands.has_permissions(administrator=True)
-async def status(ctx, playing):
-    print('ladder> Executing command __status__ in {0}, {1} initiated by {2}'.
-          format(ctx.channel, ctx.guild, ctx.author))
-    await client.change_presence(activity=discord.Game(playing))
-
 
 # * G!NEED: Generates random demons for a specified tier, or unrated demons
 @client.command()
@@ -196,6 +286,7 @@ async def need(ctx, needtier):
           format(ctx.channel, ctx.guild, ctx.author))
     try:
         # * Setup
+        responsemsg = await ctx.channel.send(content="Processing...")
         needtier = int(needtier)
         if needtier <= 0 or needtier >= 31:
             raise Exception("Tier out of range")
@@ -242,7 +333,6 @@ async def need(ctx, needtier):
                     pass
 
                 # * Embed construction
-                responsemsg = await ctx.channel.send(content="Processing...")
                 await responsemsg.add_reaction("🔁")
 
                 loop = True
@@ -371,6 +461,54 @@ async def need(ctx, needtier):
                 'ladder> Command execution complete as tier is of incorrect syntax.'
             )
 
+# * G!RATING: Sends rating towards #rating-response-mod *
+@client.command()
+async def rating(ctx, playername, refreshrate, levelname, levelid, creator,
+                 leveltier, *dropped):
+    print('ladder> Executing command __rating__ in {0}, {1} initiated by {2}'.
+          format(ctx.channel, ctx.guild, ctx.author))
+    dropped = list(dropped)
+    try: levelenjoy = dropped.pop(0)
+    except: levelenjoy = None
+    channel = client.get_channel(744552880991764520)
+    await ctx.message.delete()
+    await channel.send("""
+New response submitted at {0} UTC
+This is a NORMAL response.
+User: {1}
+Refresh rate: {2}
+Level Name: {3}
+ID: {4}
+Creator: {5}
+Rated Tier: {6}
+Rated Enjoyment: {7}
+Dropped string: {8}
+    """.format(
+        str(datetime.datetime.now(tz=pytz.utc))[0:-13], playername,
+        refreshrate, levelname, levelid, creator, leveltier, levelenjoy, dropped))
+    print('ladder> Command execution complete.')
+
+# * G!ENJOY: Sends enjoyment rating towards #rating-response-mod *
+@client.command()
+async def enjoy(ctx, playername, levelname, levelid, creator,
+                 levelenjoy, *dropped):
+    print('ladder> Executing command __enjoy__ in {0}, {1} initiated by {2}'.
+          format(ctx.channel, ctx.guild, ctx.author))
+    channel = client.get_channel(946831960519610378)
+    await ctx.message.delete()
+    await channel.send("""
+- New response submitted at {0} UTC
+**THIS IS AN ENJOYMENT SUBMISSION**
+- User: {1}
+- Level Name: {2}
+- ID: {3}
+- Creator: {4}
+- Rated Enjoyment: {5}
+- Dropped string: {6}
+    """.format(
+        str(datetime.datetime.now(tz=pytz.utc))[0:-13], playername,
+        levelname, levelid, creator, levelenjoy, dropped))
+    print('ladder> Command execution complete.')
 
 # * G!USER: Generates submitted ratings for a specified username *
 @client.command()
@@ -514,94 +652,6 @@ async def user(ctx, username, *args):
                 print(
                     'ladder> Command execution complete as an error occured.')
 
-
-# * G!RATING: Sends rating towards #rating-response-mod *
-@client.command()
-async def rating(ctx, playername, refreshrate, levelname, levelid, creator,
-                 leveltier, *dropped):
-    print('ladder> Executing command __rating__ in {0}, {1} initiated by {2}'.
-          format(ctx.channel, ctx.guild, ctx.author))
-    dropped = list(dropped)
-    try: levelenjoy = dropped.pop(0)
-    except: levelenjoy = None
-    channel = client.get_channel(744552880991764520)
-    await ctx.message.delete()
-    await channel.send("""
-New response submitted at {0} UTC
-This is a NORMAL response.
-User: {1}
-Refresh rate: {2}
-Level Name: {3}
-ID: {4}
-Creator: {5}
-Rated Tier: {6}
-Rated Enjoyment: {7}
-Dropped string: {8}
-    """.format(
-        str(datetime.datetime.now(tz=pytz.utc))[0:-13], playername,
-        refreshrate, levelname, levelid, creator, leveltier, levelenjoy, dropped))
-    print('ladder> Command execution complete.')
-
-# * G!ENJOY: Sends enjoyment rating towards #rating-response-mod *
-@client.command()
-async def enjoy(ctx, playername, levelname, levelid, creator,
-                 levelenjoy, *dropped):
-    print('ladder> Executing command __enjoy__ in {0}, {1} initiated by {2}'.
-          format(ctx.channel, ctx.guild, ctx.author))
-    channel = client.get_channel(946831960519610378)
-    await ctx.message.delete()
-    await channel.send("""
-- New response submitted at {0} UTC
-**THIS IS AN ENJOYMENT SUBMISSION**
-- User: {1}
-- Level Name: {2}
-- ID: {3}
-- Creator: {4}
-- Rated Enjoyment: {5}
-- Dropped string: {6}
-    """.format(
-        str(datetime.datetime.now(tz=pytz.utc))[0:-13], playername,
-        levelname, levelid, creator, levelenjoy, dropped))
-    print('ladder> Command execution complete.')
-                     
-# * G!BEAN: Beans. *
-@client.command()
-async def bean(ctx, person, *reason):
-    print('ladder> Executing command __bean__ in {0}, {1} initiated by {2}'.
-          format(ctx.channel, ctx.guild, ctx.author))
-    if "!" in person: personid = person[3:-1]
-    else: personid = person[2:-1]
-    print(personid)
-    try:
-        person_user = await client.fetch_user(personid)
-    except:
-        if "#" in person:
-            person_tag = person.split("#", 1)
-            person_user = discord.utils.get(client.get_all_members(), name=person_tag[0], discriminator=person_tag[1])
-        else:
-            person_user = discord.utils.get(client.get_all_members(), name=person)
-    if person_user != None:
-        if len(reason) == 0: reasontext = "No reason given."
-        else: reasontext = ' '.join(reason)
-        await ctx.channel.send(
-            "<:yes_tick:744780635641610240> {0}#{1} (`{2}`) was beaned. Reason: `{3}`"
-            .format(person_user.name, person_user.discriminator,
-                    person_user.id, reasontext))
-    elif person == "everyone":
-        await ctx.channel.send("I too wish to give beans to everyone.")
-    else:
-        await ctx.channel.send("No user found for `{0}`!".format(person))
-    print('ladder> Bean successful. Waiting for person to send message in an hour.')
-    
-    def check(msg):
-        return (msg.author == person_user)
-
-    emoji = discord.utils.get(client.emojis, name='mrbean')
-    msg = await client.wait_for('message', timeout=3600.0, check=check)
-    await msg.add_reaction(emoji)
-        
-    print('ladder> Command execution complete.')
-
 # * G!SEND: Administrator only, sends ID to boss *
 @client.command()
 @commands.has_permissions(administrator=True)
@@ -615,9 +665,9 @@ async def send(ctx, idcall):
     await channel.send(embed=embed)
     print('ladder> Command execution complete.')
 
-# * G!MESSAGE: Administrator only, make bot talk *
+# * G!MESSAGE: Moderators only, make bot talk *
 @client.command()
-@commands.has_permissions(administrator=True)
+@commands.has_permissions(manage_messages=True)
 async def message(ctx, *, message):
     print('ladder> Executing command __message__ in {0}, {1} initiated by {2}'.
           format(ctx.channel, ctx.guild, ctx.author))
@@ -625,15 +675,32 @@ async def message(ctx, *, message):
     await ctx.channel.send(message)
     print('ladder> Command execution complete.')
 
-# * G!ANNOUNCE: Administrator only, make bot talk at #announcement*
+# * G!ANNOUNCE: Administrators only, make bot talk at #announcement*
+# Currently unused until I find a way to specify admins only in our server
+# @client.command()
+# @commands.has_permissions(administrator=True)
+# async def announce(ctx, *, message):
+#    print('ladder> Executing command __announce__ in {0}, {1} initiated by {2}'.
+#          format(ctx.channel, ctx.guild, ctx.author))
+#    channel = client.get_channel(756512731124727988)
+#    await channel.send(message)
+#    print('ladder> Command execution complete.')
+
+# * G!STATUS: Administrators only, change the status of the bot *
+# this is just for legacy purposes, now the bot does it automatically
 @client.command()
 @commands.has_permissions(administrator=True)
-async def announce(ctx, *, message):
-    print('ladder> Executing command __announce__ in {0}, {1} initiated by {2}'.
+async def status(ctx, playing):
+    print('ladder> Executing command __status__ in {0}, {1} initiated by {2}'.
           format(ctx.channel, ctx.guild, ctx.author))
-    channel = client.get_channel(756512731124727988)
-    await channel.send(message)
-    print('ladder> Command execution complete.')
+    await client.change_presence(activity=discord.Game(playing))
+
+# * G!FALLBACK: Administrators only, fallback to bot list if needed *
+# Currently does nothing until I find a way to specify admins in only our server
+@client.command()
+@commands.has_permissions(administrator=True)
+async def fallback(ctx, toggle):
+    pass
 
 # * G!HELP: Information about commands *
 @client.command(aliases=['info'])
