@@ -282,7 +282,7 @@ async def level(ctx, id_search):
                         ratingtext = ""
                         for i in display_range:
                             ratingtext = "".join([ratingtext, "- Tier {0} by {1}\n".format(ratings_active[i][0], ratings_active[i][1])])
-                        embed.add_field(name="Submitted ratings (Page {1} of {2})".format(page + 1, totalpages),
+                        embed.add_field(name="Submitted ratings (Page {0} of {1})".format(page + 1, totalpages),
                                     value=ratingtext,
                                     inline=True)
                         await responsemsg.edit(content="", embed=embed)
@@ -330,7 +330,7 @@ async def level(ctx, id_search):
                             pass
                 else:
                     ratingtext = ""
-                    for i in ratings:
+                    for i in ratings_active:
                         ratingtext = "".join([ratingtext, "- Tier {0} by {1}\n".format(i[0], i[1])])
                     embed.add_field(name="Submitted ratings",
                                     value=ratingtext,
