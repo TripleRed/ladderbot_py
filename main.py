@@ -1,7 +1,7 @@
 # GD Demon Ladder Discord bot
 # Written by RFMX, (c) 2021-2022
 
-# ver 1.2-beta1
+# ver 1.2-beta2
 
 """
 This bot is written to make searching for demons easier in server.
@@ -25,8 +25,9 @@ g!help: Shows info about commands.
 TODO:
 [DONE] g!level: Change to show the submitted ratings in pages
 g!level: Change the fun section to fetch from a JSON file
-g!level, g!user, g!need(?): Add enjoyment components.
-g!rating, g!enjoy: Change the format to simplify the command
+g!level [v], g!user, g!need(?): Add enjoyment components.
+g!rating, g!enjoy: Change the format to optimise the command
+Add g!moreinfo or whatever
 Find out why it sends too many requests
 """
 
@@ -96,17 +97,24 @@ prompts_u = (
 async def bean(ctx, person, *reason):
     print('ladder> Executing command __bean__ in {0}, {1} initiated by {2}'.
           format(ctx.channel, ctx.guild, ctx.author))
-    if "!" in person: personid = person[3:-1]
-    else: personid = person[2:-1]
+
+    # * Processing
+    if "!" in person: personid = person[3:-1] # when the tag is in the form of <@!1234567890>
+    else: personid = person[2:-1] # when the tag is in the form of <@1234567890>
+    print(person)
     print(personid)
+
+    # * Get user
     try:
-        person_user = await client.fetch_user(personid)
+        person_user = await client.fetch_user(personid) # see if personid is a tag
     except:
         if "#" in person:
-            person_tag = person.split("#", 1)
+            person_tag = person.split("#", 1) # cut away the discrim
             person_user = discord.utils.get(client.get_all_members(), name=person_tag[0], discriminator=person_tag[1])
         else:
             person_user = discord.utils.get(client.get_all_members(), name=person)
+
+    # Start beaning
     if person_user != None:
         if len(reason) == 0: reasontext = "No reason given."
         else: reasontext = ' '.join(reason)
@@ -119,7 +127,8 @@ async def bean(ctx, person, *reason):
     else:
         await ctx.channel.send("No user found for `{0}`!".format(person))
     print('ladder> Bean successful. Waiting for person to send message in an hour.')
-    
+
+    # Await message and react
     def check(msg):
         return (msg.author == person_user)
 
@@ -135,9 +144,11 @@ async def level(ctx, id_search):
     print('ladder> Executing command __level__ in {0}, {1} initiated by {2}'.
           format(ctx.channel, ctx.guild, ctx.author))  # prompt in console
 
-    # * HTTP requests
+    # * Setup
     responsemsg = await ctx.channel.send(content="Processing...")
     global apikey
+
+    # * HTTP request to check for the row no. of demon
     url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'The List'!E:E?key=" + apikey # URL construction
     print('ladder> Requesting to Google sheets for data at Column E.')
     async with aiohttp.ClientSession() as session:
@@ -152,6 +163,8 @@ async def level(ctx, id_search):
                 demon_no = r_json.index(id_array)
             except:
                 demon_no = -1 # null response
+
+    # * HTTP request to obtain demon info in main list
     if demon_no != -1:
         row_no = demon_no + 1 # off by one :3
         row_select = "'The List'!" + str(row_no) + ":" + str(row_no) # construct area in A1 notation
@@ -190,6 +203,35 @@ async def level(ctx, id_search):
                     tier = 'Unrated'
                     ratings = None
 
+    # * HTTP request to obtain demon info in side list
+    # this code block is still under if demon_no != -1
+        row_select = "'Side List'!" + str(row_no) + ":" + str(row_no) # construct area in A1 notation
+        url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/" + row_select + "?key=" + apikey # URL cnstruction again
+        print('ladder> Requesting to Google sheets for SIDE list data at row {0}'.format(
+            row_no))
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                print("ladder> Status:", response.status)
+                r_json = await response.text()
+                r_json = json.loads(r_json)
+                r_json = r_json['values']
+                r_json = r_json[0]
+
+                if r_json[5] != "unrated":
+                    tier_e = r_json[5]
+                    tier2dp_e = r_json[6]
+                    ratings_e = []
+                    i = 7
+                    try:
+                        while r_json[i] != '':
+                            ratings_e.append([r_json[i], r_json[i+1]])
+                            i += 2
+                    except:
+                        pass
+                else:
+                    tier_e = 'Unrated'
+                    ratings_e = None
+
     # * Constructing embed
     if demon_no != -1:
         if tier != 'Unrated':            
@@ -197,7 +239,7 @@ async def level(ctx, id_search):
         else:            
             embed = discord.Embed(title="Level information of {0} ({1})".format(name, id_search), url=gdbrowser_url, color=tierhex[0])
 
-        # Fun section, TODO rewrite this section so that this obtains info from an external file
+        # * Fun section, TODO rewrite this section so that this obtains info from an external file
         if id_search == "60660086":
             embed.set_footer(text="- Tier what the fuck do you mean multition 6")
         elif id_search == "76074130":
@@ -208,69 +250,146 @@ async def level(ctx, id_search):
         embed.add_field(name="Official Difficulty",
                         value=officialdiff,
                         inline=True)
-        if tier != 'Unrated':
-            embed.add_field(name="Tier",
-                            value="Tier {0} ({1})".format(tier, tier2dp),
-                            inline=False)
-        else:
-            embed.add_field(name="Tier", value="Unrated", inline=False)
-        if ratings != None:
-            loop = True
-            if len(ratings) > 10:
-                totalpages = int(math.ceil(len(ratings) / 10))
-                page = 0
-                await responsemsg.add_reaction("⬅️")
-                await responsemsg.add_reaction("➡️")
-                while loop:
-                    if len(ratings) < 10 * (page + 1):
-                        display_range = range(10 * page, len(ratings))
-                    else:
-                        display_range = range(10 * page, 10 * (page + 1))
-                    ratingtext = ""
-                    for i in display_range:
-                        ratingtext = "".join([ratingtext, "- Tier {0} by {1}\n".format(ratings[i][0], ratings[i][1])])
-                    embed.add_field(name="Submitted ratings (Page {0} of {1})".format(page + 1, totalpages),
-                                value=ratingtext,
-                                inline=True)
-                    await responsemsg.edit(content="", embed=embed)
-                    print(
-                        "ladder> Command execution complete with samples generated. Printed Page {0}. Awaiting further response."
-                        .format((page + 1)))
 
+        # * Setup
+        ratings_active = ratings
+        tier_active = tier
+        tier2dp_active = tier2dp
+        active = "difficulty"
+        switchloop = True
+        
+        while switchloop == True:
+            switchloop = False
+            if tier_active != 'Unrated':
+                embed.add_field(name="{0} Tier".format(active.title()),
+                                value="Tier {0} ({1})".format(tier_active, tier2dp_active),
+                                inline=False)
+            else:
+                embed.add_field(name="{0} Tier".format(active.title()), value="Unrated", inline=False)
+            if ratings_active != None:
+                loop = True
+                if len(ratings_active) > 10:
+                    totalpages = int(math.ceil(len(ratings_active) / 10))
+                    page = 0
+                    await responsemsg.add_reaction("⬅️")
+                    await responsemsg.add_reaction("➡️")
+                    await responsemsg.add_reaction("🔁")
+                    while loop:
+                        if len(ratings_active) < 10 * (page + 1):
+                            display_range = range(10 * page, len(ratings_active))
+                        else:
+                            display_range = range(10 * page, 10 * (page + 1))
+                        ratingtext = ""
+                        for i in display_range:
+                            ratingtext = "".join([ratingtext, "- Tier {0} by {1}\n".format(ratings_active[i][0], ratings_active[i][1])])
+                        embed.add_field(name="Submitted ratings (Page {1} of {2})".format(page + 1, totalpages),
+                                    value=ratingtext,
+                                    inline=True)
+                        await responsemsg.edit(content="", embed=embed)
+                        print(
+                            "ladder> Command execution complete with samples generated. Printed Page {0}. Awaiting further response."
+                            .format((page + 1)))
+    
+                        def check(reaction, user):
+                            return (user == ctx.author and (str(reaction.emoji) == "⬅️" or str(reaction.emoji) == "➡️" or str(reaction.emoji) == "🔁"))
+    
+                        try:
+                            reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
+                            print(reaction)
+                            embed.remove_field(-1)
+                            if reaction.emoji == "⬅️" and page > 0:
+                                page -= 1
+                            elif reaction.emoji == "➡️" and page < (totalpages - 1):
+                                page += 1
+                            elif reaction.emoji == "🔁":
+                                print("ladder> Switching between main and side list.")
+                                await responsemsg.remove_reaction("🔁", ctx.author)
+                                switchloop = True
+                                embed.remove_field(-1)
+                                if ratings_active == ratings:
+                                    ratings_active = ratings_e
+                                    tier_active = tier_e
+                                    tier2dp_active = tier2dp_e
+                                    active = "enjoyment"
+                                else: # contains both ratings_active being equal to side list and ratings_active being modified for some reason
+                                    ratings_active = ratings
+                                    tier_active = tier
+                                    tier2dp_active = tier2dp
+                                    active = "difficulty"
+                                break
+                        except asyncio.TimeoutError:
+                            loop = False
+                            print("ladder> Timeout.")
+                        try:
+                            await responsemsg.remove_reaction("⬅️", ctx.author)
+                        except:
+                            pass
+                        try:
+                            await responsemsg.remove_reaction("➡️", ctx.author)
+                        except:
+                            pass
+                else:
+                    ratingtext = ""
+                    for i in ratings:
+                        ratingtext = "".join([ratingtext, "- Tier {0} by {1}\n".format(i[0], i[1])])
+                    embed.add_field(name="Submitted ratings",
+                                    value=ratingtext,
+                                    inline=True)
+                    await responsemsg.edit(content="",embed=embed)
+
+                    await responsemsg.add_reaction("🔁")
                     def check(reaction, user):
-                        return (user == ctx.author and (str(reaction.emoji) == "⬅️" or str(reaction.emoji) == "➡️"))
+                        return (user == ctx.author and (str(reaction.emoji) == "🔁"))
 
                     try:
-                        reaction, user = await client.wait_for(
-                            'reaction_add', timeout=60.0, check=check)
+                        reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
                         print(reaction)
+                        print("ladder> Switching between main and side list.")
+                        await responsemsg.remove_reaction("🔁", ctx.author)
                         embed.remove_field(-1)
-                        if reaction.emoji == "⬅️" and page > 0:
-                            page -= 1
-                        elif reaction.emoji == "➡️" and page < (
-                                totalpages - 1):
-                            page += 1
+                        embed.remove_field(-1)
+                        switchloop = True
+                        if ratings_active == ratings:
+                            ratings_active = ratings_e
+                            tier_active = tier_e
+                            tier2dp_active = tier2dp_e
+                            active = "enjoyment"
+                        else: # contains both ratings_active being equal to side list and ratings_active being modified for some reason
+                            ratings_active = ratings
+                            tier_active = tier
+                            tier2dp_active = tier2dp
+                            active = "difficulty"
                     except asyncio.TimeoutError:
                         loop = False
                         print("ladder> Timeout.")
-                    try:
-                        await responsemsg.remove_reaction("⬅️", ctx.author)
-                    except:
-                        pass
-                    try:
-                        await responsemsg.remove_reaction("➡️", ctx.author)
-                    except:
-                        pass
             else:
-                ratingtext = ""
-                for i in ratings:
-                    ratingtext = "".join([ratingtext, "- Tier {0} by {1}\n".format(i[0], i[1])])
-                embed.add_field(name="Submitted ratings",
-                                value=ratingtext,
-                                inline=True)
                 await responsemsg.edit(content="",embed=embed)
-        else:
-            await responsemsg.edit(content="",embed=embed)
+                await responsemsg.add_reaction("🔁")
+                def check(reaction, user):
+                    return (user == ctx.author and (str(reaction.emoji) == "🔁"))
+
+                try:
+                    reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
+                    print(reaction)
+                    print("ladder> Switching between main and side list.")
+                    await responsemsg.remove_reaction("🔁", ctx.author)
+                    embed.remove_field(-1)
+                    embed.remove_field(-1)
+                    switchloop = True
+                    if ratings_active == ratings:
+                        ratings_active = ratings_e
+                        tier_active = tier_e
+                        tier2dp_active = tier2dp_e
+                        active = "enjoyment"
+                    else: # contains both ratings_active being equal to side list and ratings_active being modified for some reason
+                        ratings_active = ratings
+                        tier_active = tier
+                        tier2dp_active = tier2dp
+                        active = "difficulty"
+                except asyncio.TimeoutError:
+                    loop = False
+                    print("ladder> Timeout.")
+            print(switchloop)
     else:
         embed = discord.Embed(title="There is no demon with the ID {0}!".format(id_search), \
         color=0xED4337)
