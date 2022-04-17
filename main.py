@@ -592,18 +592,18 @@ async def rating(ctx, playername, refreshrate, levelname, levelid, creator,
     channel = client.get_channel(744552880991764520)
     await ctx.message.delete()
     await channel.send("""
-New response submitted at {0} UTC
+New response submitted at {0} UTC by {1}
 This is a NORMAL response.
-User: {1}
-Refresh rate: {2}
-Level Name: {3}
-ID: {4}
-Creator: {5}
-Rated Tier: {6}
-Rated Enjoyment: {7}
-Dropped string: {8}
+User: {2}
+Refresh rate: {3}
+Level Name: {4}
+ID: {5}
+Creator: {6}
+Rated Tier: {7}
+Rated Enjoyment: {8}
+Dropped string: {9}
     """.format(
-        str(datetime.datetime.now(tz=pytz.utc))[0:-13], playername,
+        str(datetime.datetime.now(tz=pytz.utc))[0:-13], ctx.author, playername,
         refreshrate, levelname, levelid, creator, leveltier, levelenjoy, dropped))
     print('ladder> Command execution complete.')
 
@@ -616,16 +616,16 @@ async def enjoy(ctx, playername, levelname, levelid, creator,
     channel = client.get_channel(946831960519610378)
     await ctx.message.delete()
     await channel.send("""
-- New response submitted at {0} UTC
+- New response submitted at {0} UTC by {1}
 **THIS IS AN ENJOYMENT SUBMISSION**
-- User: {1}
-- Level Name: {2}
-- ID: {3}
-- Creator: {4}
-- Rated Enjoyment: {5}
-- Dropped string: {6}
+- User: {2}
+- Level Name: {3}
+- ID: {4}
+- Creator: {5}
+- Rated Enjoyment: {6}
+- Dropped string: {7}
     """.format(
-        str(datetime.datetime.now(tz=pytz.utc))[0:-13], playername,
+        str(datetime.datetime.now(tz=pytz.utc))[0:-13], ctx.author, playername,
         levelname, levelid, creator, levelenjoy, dropped))
     print('ladder> Command execution complete.')
 
@@ -860,7 +860,7 @@ async def help(ctx, *args):
         await ctx.send(embed=embed)
     elif "level" in args:
         embed = discord.Embed(title="g!level <id>", \
-        description="Shows information about the level in the list. This includes the current tier and submitted ratings.", \
+        description="Shows information about the level in the list. This includes the current tier and submitted ratings. Press the :repeat: button to switch between difficulty and enjoyment ratings!", \
         color=0xCCFF00)
         await ctx.send(embed=embed)
     elif "need" in args:
