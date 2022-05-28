@@ -1,7 +1,7 @@
 # GD Demon Ladder Discord bot
 # Written by RFMX, (c) 2021-2022
 
-# ver 1.2-beta2
+# ver 1.2-beta3
 
 """
 This bot is written to make searching for demons easier in server.
@@ -35,19 +35,22 @@ Find out why it sends too many requests
 import logging, discord, asyncio, aiohttp, json, random, os, datetime, pytz, keep_alive, math
 from discord.ext import commands, tasks
 
+emerald_sleep = False
+
 random.seed(a=os.urandom(32))  # set seed for randomness
 logging.basicConfig(level=logging.INFO)  # logging so that I see stuff
 token = os.environ.get("TOKEN")  # Discord bot token
 apikey = os.environ.get("APIKEY")  # Google sheets API key
 sheetid = "1Cq6TcaXZU7w8jVpgy4pYpmI76ALwQqX7Mm8itETz9wU" # sheet in use
-# original: 1xaMERl70vzr8q9MqElr4YethnV15EOe8oL1UV9LLljc
-# bot: 1Cq6TcaXZU7w8jVpgy4pYpmI76ALwQqX7Mm8itETz9wU
+original_sheet = "1xaMERl70vzr8q9MqElr4YethnV15EOe8oL1UV9LLljc"
+bot_sheet = "1Cq6TcaXZU7w8jVpgy4pYpmI76ALwQqX7Mm8itETz9wU"
+gddladmins = {'439091096287707149', '556323843925475328', '374239444057849856'}
 
 # * Discord bot set-up *
 intents = discord.Intents.default()
 intents.members = True
 intents.messages = True
-client = commands.Bot(intents=intents, command_prefix='g!', help_command=None)
+client = commands.Bot(intents=intents, command_prefix='b!', help_command=None)
 
 # * Color hex for tiers *
 tierhex = (0xBBBBBB,
@@ -201,6 +204,7 @@ async def level(ctx, id_search):
                         pass
                 else:
                     tier = 'Unrated'
+                    tier2dp = None
                     ratings = None
 
     # * HTTP request to obtain demon info in side list
@@ -230,6 +234,7 @@ async def level(ctx, id_search):
                         pass
                 else:
                     tier_e = 'Unrated'
+                    tier2dp_e = None
                     ratings_e = None
 
     # * Constructing embed
@@ -240,10 +245,10 @@ async def level(ctx, id_search):
             embed = discord.Embed(title="Level information of {0} ({1})".format(name, id_search), url=gdbrowser_url, color=tierhex[0])
 
         # * Fun section, TODO rewrite this section so that this obtains info from an external file
-        if id_search == "60660086":
-            embed.set_footer(text="- Tier what the fuck do you mean multition 6")
-        elif id_search == "76074130":
-            embed.set_footer(text="i too love consuming vast amounts of chlorine!")
+        # if id_search == "60660086":
+        #    embed.set_footer(text="- Tier what the fuck do you mean multition 6")
+        # elif id_search == "76074130":
+        #    embed.set_footer(text="i too love consuming vast amounts of chlorine!")
         
         embed.add_field(name="Creator", value=creator, inline=True)
         embed.add_field(name="Song", value=song, inline=True)
@@ -255,14 +260,29 @@ async def level(ctx, id_search):
         ratings_active = ratings
         tier_active = tier
         tier2dp_active = tier2dp
+        tiertext_active = "Tier "
         active = "difficulty"
         switchloop = True
+        def replace():
+            nonlocal active, ratings_active, tier_active, tier2dp_active, tiertext_active
+            if active == "difficulty":
+                ratings_active = ratings_e
+                tier_active = tier_e
+                tier2dp_active = tier2dp_e
+                tiertext_active = ""
+                active = "enjoyment"
+            else:
+                ratings_active = ratings
+                tier_active = tier
+                tier2dp_active = tier2dp
+                tiertext_active = "Tier "
+                active = "difficulty"
         
         while switchloop == True:
             switchloop = False
             if tier_active != 'Unrated':
                 embed.add_field(name="{0} Tier".format(active.title()),
-                                value="Tier {0} ({1})".format(tier_active, tier2dp_active),
+                                value="{0}{1} ({2})".format(tiertext_active, tier_active, tier2dp_active),
                                 inline=False)
             else:
                 embed.add_field(name="{0} Tier".format(active.title()), value="Unrated", inline=False)
@@ -281,7 +301,7 @@ async def level(ctx, id_search):
                             display_range = range(10 * page, 10 * (page + 1))
                         ratingtext = ""
                         for i in display_range:
-                            ratingtext = "".join([ratingtext, "- Tier {0} by {1}\n".format(ratings_active[i][0], ratings_active[i][1])])
+                            ratingtext = "".join([ratingtext, "- {0}{1} by {2}\n".format(tiertext_active, ratings_active[i][0], ratings_active[i][1])])
                         embed.add_field(name="Submitted ratings (Page {0} of {1})".format(page + 1, totalpages),
                                     value=ratingtext,
                                     inline=True)
@@ -306,16 +326,7 @@ async def level(ctx, id_search):
                                 await responsemsg.remove_reaction("🔁", ctx.author)
                                 switchloop = True
                                 embed.remove_field(-1)
-                                if ratings_active == ratings:
-                                    ratings_active = ratings_e
-                                    tier_active = tier_e
-                                    tier2dp_active = tier2dp_e
-                                    active = "enjoyment"
-                                else: # contains both ratings_active being equal to side list and ratings_active being modified for some reason
-                                    ratings_active = ratings
-                                    tier_active = tier
-                                    tier2dp_active = tier2dp
-                                    active = "difficulty"
+                                replace()
                                 break
                         except asyncio.TimeoutError:
                             loop = False
@@ -349,16 +360,7 @@ async def level(ctx, id_search):
                         embed.remove_field(-1)
                         embed.remove_field(-1)
                         switchloop = True
-                        if ratings_active == ratings:
-                            ratings_active = ratings_e
-                            tier_active = tier_e
-                            tier2dp_active = tier2dp_e
-                            active = "enjoyment"
-                        else: # contains both ratings_active being equal to side list and ratings_active being modified for some reason
-                            ratings_active = ratings
-                            tier_active = tier
-                            tier2dp_active = tier2dp
-                            active = "difficulty"
+                        replace()
                     except asyncio.TimeoutError:
                         loop = False
                         print("ladder> Timeout.")
@@ -374,18 +376,8 @@ async def level(ctx, id_search):
                     print("ladder> Switching between main and side list.")
                     await responsemsg.remove_reaction("🔁", ctx.author)
                     embed.remove_field(-1)
-                    embed.remove_field(-1)
                     switchloop = True
-                    if ratings_active == ratings:
-                        ratings_active = ratings_e
-                        tier_active = tier_e
-                        tier2dp_active = tier2dp_e
-                        active = "enjoyment"
-                    else: # contains both ratings_active being equal to side list and ratings_active being modified for some reason
-                        ratings_active = ratings
-                        tier_active = tier
-                        tier2dp_active = tier2dp
-                        active = "difficulty"
+                    replace()
                 except asyncio.TimeoutError:
                     loop = False
                     print("ladder> Timeout.")
@@ -794,32 +786,23 @@ async def message(ctx, *, message):
     await ctx.channel.send(message)
     print('ladder> Command execution complete.')
 
-# * G!ANNOUNCE: Administrators only, make bot talk at #announcement*
-# Currently unused until I find a way to specify admins only in our server
-# @client.command()
-# @commands.has_permissions(administrator=True)
-# async def announce(ctx, *, message):
-#    print('ladder> Executing command __announce__ in {0}, {1} initiated by {2}'.
-#          format(ctx.channel, ctx.guild, ctx.author))
-#    channel = client.get_channel(756512731124727988)
-#    await channel.send(message)
-#    print('ladder> Command execution complete.')
+# * G!ANNOUNCE: GDDL Admins only, make bot talk at #announcement*
+@client.command()
+@commands.is_owner()
+async def announce(ctx, *, message):
+    print('ladder> Executing command __announce__ in {0}, {1} initiated by {2}'.format(ctx.channel, ctx.guild, ctx.author))
+    channel = client.get_channel(756512731124727988)
+    await channel.send(message)
+    print('ladder> Command execution complete.')
 
 # * G!STATUS: Administrators only, change the status of the bot *
 # this is just for legacy purposes, now the bot does it automatically
 @client.command()
-@commands.has_permissions(administrator=True)
+@commands.is_owner()
 async def status(ctx, playing):
     print('ladder> Executing command __status__ in {0}, {1} initiated by {2}'.
           format(ctx.channel, ctx.guild, ctx.author))
     await client.change_presence(activity=discord.Game(playing))
-
-# * G!FALLBACK: Administrators only, fallback to bot list if needed *
-# Currently does nothing until I find a way to specify admins in only our server
-@client.command()
-@commands.has_permissions(administrator=True)
-async def fallback(ctx, toggle):
-    pass
 
 # * G!HELP: Information about commands *
 @client.command(aliases=['info'])
@@ -829,7 +812,7 @@ async def help(ctx, *args):
     args = list(args)
     if len(args) == 0:
         embed = discord.Embed(title="LadderBot help", \
-        description="This is a list of commands you can use! Parameters are enclosed in <>s.\nFor more info, join the following server: https://discord.gg/TWhxaeM", \
+        description="This is a list of commands you can use! Parameters are enclosed in <>s.\nFor more info, join the following server: https://discord.gg/gddl", \
         color=0xCCFF00)
         embed.add_field(name="-----", \
         value="""
@@ -896,20 +879,49 @@ async def help(ctx, *args):
 async def change_status():
     await client.change_presence(activity=discord.Game("g!help"))
 
-
+@tasks.loop(seconds=7200)
+async def source_update():
+    global sheetid
+    print("ladder> 2 hour check on whether main is useable.")
+    url = "https://sheets.googleapis.com/v4/spreadsheets/" + original_sheet + "/values/'The List'!E:E?majorDimension=ROWS&key=" + apikey
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == "200":
+                sheetid = original_sheet
+            else:
+                sheetid = bot_sheet
+            
+    
 # ** Events **
 @client.event
 async def on_ready():
     print('ladder> Logged in as {0.user}'.format(client))
     change_status.start()
 
-
 @client.event
 async def on_message(message):
+    global emerald_sleep
     if message.author == client.user:
         return
 
-    if message.content.startswith('g!ping'):
+    if (message.author == client.get_user(556323843925475328) and emerald_sleep == True):
+        check_time = datetime.datetime.utcnow().time()
+        if check_time >= datetime.time(18,0) and check_time <= datetime.time(23,0):
+            response_msg = await message.channel.send('Stop resisting and just sleep, <@556323843925475328>.')
+            print('ladder> Asking Emerald to sleep.')
+            await asyncio.sleep(15)
+            await response_msg.delete()
+
+    if (message.author == client.get_user(439091096287707149) and emerald_sleep == True):
+        check_time = datetime.datetime.utcnow().time()
+        rd = random.randint(1,100)
+        if (check_time >= datetime.time(18,0) and check_time <= datetime.time(23,0)) and rd == 1:
+            response_msg = await message.channel.send('Don\'t think you can get away from this, <@439091096287707149>.')
+            print('ladder> Asking RFMX to sleep.')
+            await asyncio.sleep(15)
+            await response_msg.delete()
+    
+    if message.content.startswith('b!ping'):
         print('ladder> Pinged. Responding.')
         await message.channel.send('Pong!')
     else:
