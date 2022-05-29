@@ -65,7 +65,8 @@ prompts_e = ("A Tier {0}, you say?", "Grinding demons, eh?",
              "Let me guess, you are beating an Extreme? No? Okay.",
              "Tier {0}? Gotcha.", "even harder than Back on Track tbh",
              "Finally pulling yourself to beat another demon, aren't you?",
-             "Certified as Tier {0}, players approved")
+             "Certified as Tier {0}, players approved",
+            "")
 # * Prompts for harder demons (Tiers 11-30)
 prompts_h = ("A Tier {0}, you say?", "Fancy a challenge, eh?",
              "I guess one of these would be your next hardest.", "Um, go?",
@@ -82,7 +83,7 @@ prompts_u = (
     "I see you're into stuff that is unknown.",
     "Yes. It helps the project grow. Do remember to drop a rating.",
     "Warning: enjoyability not guaranteed.", "I hope you run into Ouroboros.",
-    "There's 3/4 of levels bearing a tier and you are picking these.",
+    "There's 90% of levels bearing a tier and you are picking these.",
     "I can't stop you from being the curious cat.",
     "Curiosity allows people to discover hidden gems.",
     "Maybe you can make a race out of these.",
@@ -92,6 +93,16 @@ prompts_u = (
     "Finally getting yourself to... what? Unrated?", "so random",
     "support the GD Demon Ladder thanks",
     "*inserts random quote about being random*")
+
+# ** Request function **
+async def request(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            print("ladder> Status:", response.status)
+            r_json = await response.text()
+            r_json = json.loads(r_json)
+            r_json = r_json['values']
+    return r_json
 
 # ** Commands **
 
@@ -104,8 +115,8 @@ async def bean(ctx, person, *reason):
     # * Processing
     if "!" in person: personid = person[3:-1] # when the tag is in the form of <@!1234567890>
     else: personid = person[2:-1] # when the tag is in the form of <@1234567890>
-    print(person)
-    print(personid)
+    # print(person)
+    # print(personid)
 
     # * Get user
     try:
@@ -143,30 +154,108 @@ async def bean(ctx, person, *reason):
 
 # * G!LEVEL: this receives a level ID then spits data about it *
 @client.command()
-async def level(ctx, id_search):
+async def level(ctx, id_search, *extra):
     print('ladder> Executing command __level__ in {0}, {1} initiated by {2}'.
           format(ctx.channel, ctx.guild, ctx.author))  # prompt in console
 
     # * Setup
     responsemsg = await ctx.channel.send(content="Processing...")
     global apikey
+    demon_no = -1 # null response
 
     # * HTTP request to check for the row no. of demon
-    url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'The List'!E:E?key=" + apikey # URL construction
-    print('ladder> Requesting to Google sheets for data at Column E.')
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            print("ladder> Status:", response.status)
-            r_json = await response.text() # parse response
-            r_json = json.loads(r_json)
-            r_json = r_json['values']
-            id_array = []
-            id_array.append(id_search)
-            try:
-                demon_no = r_json.index(id_array)
-            except:
-                demon_no = -1 # null response
+    try:
+        int(id_search)
+        id_search_type = "int"
+        url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'The List'!E:E?key=" + apikey # URL construction
+        print('ladder> Requesting to Google sheets for data at Column E.')
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                print("ladder> Status:", response.status)
+                r_json = await response.text() # parse response
+                r_json = json.loads(r_json)
+                r_json = r_json['values']
+        id_array = []
+        id_array.append(id_search)
+        try:
+            demon_no = r_json.index(id_array)
+        except:
+            pass # demon_no will stay as -1
+    except:
+        id_search_type = "str"
+        extra = list(extra)
+        extra.insert(0, id_search)
+        id_search = " ".join(extra)
+        url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'The List'!A:A?key=" + apikey # URL construction
+        print('ladder> Requesting to Google sheets for data at Column A.')
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                print("ladder> Status:", response.status)
+                r_json = await response.text()
+                r_json = json.loads(r_json)
+                r_json = r_json['values']
+                demon_no_list = []
+                demon_name_list = []
+                for i in range(len(r_json)) :
+                    if id_search.lower() in r_json[i][0].lower():
+                        demon_no_list.append(i)
+                        demon_name_list.append(r_json[i])
 
+    # Determine type of query, and how many results are found
+
+    if id_search_type == "int":
+        pass
+        
+    elif len(demon_no_list) == 0:
+        embed = discord.Embed(title="There is no demon with the name {0}!".format(id_search), \
+        color=0xED4337)
+        await responsemsg.edit(content="",embed=embed)
+        print("ladder> Command execution complete.")
+        return
+        
+    elif len(demon_no_list) == 1:
+        demon_no = demon_no_list.pop()
+        
+    else:
+        url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'The List'!B:B?key=" + apikey # URL construction
+        print('ladder> Requesting to Google sheets for data at Column B.')
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                print("ladder> Status:", response.status)
+                r_json = await response.text()
+                r_json = json.loads(r_json)
+                r_json = r_json['values']
+        for i in demon_no_list:
+            index = demon_no_list.index(i)
+            demon_name_list[index].append(r_json[i][0])
+            
+        url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'The List'!E:E?key=" + apikey # URL construction
+        print('ladder> Requesting to Google sheets for data at Column E.')
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                print("ladder> Status:", response.status)
+                r_json = await response.text()
+                r_json = json.loads(r_json)
+                r_json = r_json['values']
+        for i in demon_no_list:
+            index = demon_no_list.index(i)
+            demon_name_list[index].append(r_json[i][0])
+
+        embed_list = []
+        j = 0
+        for i in demon_name_list:
+            j += 1
+            embed_list.append("{0} by {1} ({2})".format(i[0], i[1], i[2]))
+            if j >= 10:
+                embed_list.append("...and {0} more.".format(len(demon_name_list)-10))
+                break
+        embed_text = "\n".join(embed_list)
+        
+        embed = discord.Embed(title="Your search yields multiple results.", description=embed_text, color=0xED4337)
+        embed.set_footer(text="Use g!level with the ID to see the information of the level, or lengthen your search query to reduce the number of results.")
+        await responsemsg.edit(content="",embed=embed)
+        return
+                    
     # * HTTP request to obtain demon info in main list
     if demon_no != -1:
         row_no = demon_no + 1 # off by one :3
@@ -187,7 +276,8 @@ async def level(ctx, id_search):
                 # So r_json[0] means entry in Column A, selected row
                 
                 name = r_json[0]
-                gdbrowser_url = 'https://gdbrowser.com/' + r_json[4]
+                id_display = r_json[4]
+                gdbrowser_url = 'https://gdbrowser.com/' + id_display
                 creator = r_json[1]
                 song = r_json[2]
                 officialdiff = r_json[3]
@@ -236,13 +326,13 @@ async def level(ctx, id_search):
                     tier_e = 'Unrated'
                     tier2dp_e = None
                     ratings_e = None
-
+                    
     # * Constructing embed
     if demon_no != -1:
         if tier != 'Unrated':            
-            embed = discord.Embed(title="Level information of {0} ({1})".format(name, id_search), url=gdbrowser_url, color=tierhex[int(tier)])
+            embed = discord.Embed(title="Level information of {0} ({1})".format(name, id_display), url=gdbrowser_url, color=tierhex[int(tier)])
         else:            
-            embed = discord.Embed(title="Level information of {0} ({1})".format(name, id_search), url=gdbrowser_url, color=tierhex[0])
+            embed = discord.Embed(title="Level information of {0} ({1})".format(name, id_display), url=gdbrowser_url, color=tierhex[0])
 
         # * Fun section, TODO rewrite this section so that this obtains info from an external file
         # if id_search == "60660086":
@@ -656,112 +746,113 @@ async def user(ctx, username, *args):
             r_json = await response.text()
             r_json = json.loads(r_json)
             r_json = r_json['values']
-            submissions = []
-            specified_id = None
-            specified_tier = None
-            if idcall:
-                try:
-                    specified_id = args.pop(0)
-                except:
-                    idcall = False
-            if tiercall:
-                try:
-                    specified_tier = args.pop(0)
-                except:
-                    tiercall = False
-            for rowdata in r_json:
-                if username in rowdata:
-                    if bodycheck(username, rowdata, idcall, specified_id, tiercall, specified_tier, unratedcall):
-                        levelsubmit = [
-                            rowdata[0], rowdata[4],
-                            rowdata[rowdata.index(username) - 1]
-                        ]
-                        submissions.append(levelsubmit)
-                elif unratedcall:
-                    if (not tiercall or rowdata[5] == specified_tier):   
-                        levelsubmit = [
-                            rowdata[0], rowdata[4]
-                        ]
-                        submissions.append(levelsubmit)
-            if unratedcall and submissions[0][0] == "Name": submissions.pop(0)
-            try:
-                if len(submissions) > 0:
-                    totalpages = int(math.ceil(len(submissions) / 10))
-                    if pagecall:
-                        try:
-                            page = int(args.pop()) - 1
-                        except:
-                            page = 0
-                    else:
-                        page = 0
-                    await responsemsg.add_reaction("⬅️")
-                    await responsemsg.add_reaction("➡️")
-                    loop = True
-                    while loop:
-                        sub_excerpt = ""
-                        if len(submissions) < 10 * (page + 1):
-                            display_range = range(10 * page, len(submissions))
-                        else:
-                            display_range = range(10 * page, 10 * (page + 1))
-                        for i in display_range:
-                            if unratedcall:
-                                levelmsg = submissions[i][0] + " (" + submissions[i][1] \
-                                + ")" + "\n"
-                                sub_excerpt = sub_excerpt + levelmsg
-                            else:
-                                levelmsg = submissions[i][0] + " (" + submissions[i][1] \
-                                + ") as Tier " + submissions[i][2] + "\n"
-                                sub_excerpt = sub_excerpt + levelmsg
-                        if unratedcall: embed = discord.Embed(title="Levels without submissions for " + username, \
-                        description=sub_excerpt, \
-                        color=0xD6D6D6)
-                        else: embed = discord.Embed(title="Submissions for " + username, \
-                        description=sub_excerpt, \
-                        color=0xD6D6D6)
-                        embed.set_footer(text="Page {0} of {1} out of {2} submissions".format(page + 1, totalpages, len(submissions)),
-                        )
-                        await responsemsg.edit(content="", embed=embed)
-                        print(
-                            "ladder> Command execution complete with samples generated. Printed Page {0}. Awaiting further response."
-                            .format((page + 1)))
 
-                        def check(reaction, user):
-                            return (user == ctx.author and (str(reaction.emoji) == "⬅️" or str(reaction.emoji) == "➡️"))
-
-                        try:
-                            reaction, user = await client.wait_for(
-                                'reaction_add', timeout=180.0, check=check)
-                            print(reaction)
-                            if reaction.emoji == "⬅️" and page > 0:
-                                page -= 1
-                            elif reaction.emoji == "➡️" and page < (
-                                    totalpages - 1):
-                                page += 1
-                        except asyncio.TimeoutError:
-                            loop = False
-                            print("ladder> Timeout.")
-                        try:
-                            await responsemsg.remove_reaction("⬅️", ctx.author)
-                        except:
-                            pass
-                        try:
-                            await responsemsg.remove_reaction("➡️", ctx.author)
-                        except:
-                            pass
+    submissions = []
+    specified_id = None
+    specified_tier = None
+    if idcall:
+        try:
+            specified_id = args.pop(0)
+        except:
+            idcall = False
+    if tiercall:
+        try:
+            specified_tier = args.pop(0)
+        except:
+            tiercall = False
+    for rowdata in r_json:
+        if username in rowdata:
+            if bodycheck(username, rowdata, idcall, specified_id, tiercall, specified_tier, unratedcall):
+                levelsubmit = [
+                    rowdata[0], rowdata[4],
+                    rowdata[rowdata.index(username) - 1]
+                ]
+                submissions.append(levelsubmit)
+        elif unratedcall:
+            if (not tiercall or rowdata[5] == specified_tier):   
+                levelsubmit = [
+                    rowdata[0], rowdata[4]
+                ]
+                submissions.append(levelsubmit)
+    if unratedcall and submissions[0][0] == "Name": submissions.pop(0)
+    try:
+        if len(submissions) > 0:
+            totalpages = int(math.ceil(len(submissions) / 10))
+            if pagecall:
+                try:
+                    page = int(args.pop()) - 1
+                except:
+                    page = 0
+            else:
+                page = 0
+            await responsemsg.add_reaction("⬅️")
+            await responsemsg.add_reaction("➡️")
+            loop = True
+            while loop:
+                sub_excerpt = ""
+                if len(submissions) < 10 * (page + 1):
+                    display_range = range(10 * page, len(submissions))
                 else:
-                    embed = discord.Embed(title="No submissions found for " +
-                                          username + "!",
-                                          color=0xED4337)
-                    await responsemsg.edit(content="", embed=embed)
-                    print(
-                        'ladder> Command execution complete as no submissions are found.'
-                    )
-            except:
-                embed = discord.Embed(title="An error occured! The page number could be out of the possible range.", \
-                color=0xED4337)
-                await ctx.channel.send(embed=embed)
+                    display_range = range(10 * page, 10 * (page + 1))
+                for i in display_range:
+                    if unratedcall:
+                        levelmsg = submissions[i][0] + " (" + submissions[i][1] \
+                        + ")" + "\n"
+                        sub_excerpt = sub_excerpt + levelmsg
+                    else:
+                        levelmsg = submissions[i][0] + " (" + submissions[i][1] \
+                        + ") as Tier " + submissions[i][2] + "\n"
+                        sub_excerpt = sub_excerpt + levelmsg
+                if unratedcall: embed = discord.Embed(title="Levels without submissions for " + username, \
+                description=sub_excerpt, \
+                color=0xD6D6D6)
+                else: embed = discord.Embed(title="Submissions for " + username, \
+                description=sub_excerpt, \
+                color=0xD6D6D6)
+                embed.set_footer(text="Page {0} of {1} out of {2} submissions".format(page + 1, totalpages, len(submissions)),
+                )
+                await responsemsg.edit(content="", embed=embed)
                 print(
-                    'ladder> Command execution complete as an error occured.')
+                    "ladder> Command execution complete with samples generated. Printed Page {0}. Awaiting further response."
+                    .format((page + 1)))
+
+                def check(reaction, user):
+                    return (user == ctx.author and (str(reaction.emoji) == "⬅️" or str(reaction.emoji) == "➡️"))
+
+                try:
+                    reaction, user = await client.wait_for(
+                        'reaction_add', timeout=180.0, check=check)
+                    print(reaction)
+                    if reaction.emoji == "⬅️" and page > 0:
+                        page -= 1
+                    elif reaction.emoji == "➡️" and page < (
+                            totalpages - 1):
+                        page += 1
+                except asyncio.TimeoutError:
+                    loop = False
+                    print("ladder> Timeout.")
+                try:
+                    await responsemsg.remove_reaction("⬅️", ctx.author)
+                except:
+                    pass
+                try:
+                    await responsemsg.remove_reaction("➡️", ctx.author)
+                except:
+                    pass
+        else:
+            embed = discord.Embed(title="No submissions found for " +
+                                  username + "!",
+                                  color=0xED4337)
+            await responsemsg.edit(content="", embed=embed)
+            print(
+                'ladder> Command execution complete as no submissions are found.'
+            )
+    except:
+        embed = discord.Embed(title="An error occured! The page number could be out of the possible range.", \
+        color=0xED4337)
+        await ctx.channel.send(embed=embed)
+        print(
+            'ladder> Command execution complete as an error occured.')
 
 # * G!SEND: Administrator only, sends ID to boss *
 @client.command()
@@ -842,8 +933,8 @@ async def help(ctx, *args):
         color=0xCCFF00)
         await ctx.send(embed=embed)
     elif "level" in args:
-        embed = discord.Embed(title="g!level <id>", \
-        description="Shows information about the level in the list. This includes the current tier and submitted ratings. Press the :repeat: button to switch between difficulty and enjoyment ratings!", \
+        embed = discord.Embed(title="g!level <id or name>", \
+        description="Shows information about the level in the list. This includes the current tier and submitted ratings. Press the :repeat: button to switch between difficulty and enjoyment ratings!\n", \
         color=0xCCFF00)
         await ctx.send(embed=embed)
     elif "need" in args:
