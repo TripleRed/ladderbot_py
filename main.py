@@ -66,7 +66,7 @@ prompts_e = ("A Tier {0}, you say?", "Grinding demons, eh?",
              "Tier {0}? Gotcha.", "even harder than Back on Track tbh",
              "Finally pulling yourself to beat another demon, aren't you?",
              "Certified as Tier {0}, players approved",
-            "")
+            "So you're jumping from Bloodbath?", "so pro", "Your 62739th demon is:")
 # * Prompts for harder demons (Tiers 11-30)
 prompts_h = ("A Tier {0}, you say?", "Fancy a challenge, eh?",
              "I guess one of these would be your next hardest.", "Um, go?",
@@ -76,7 +76,7 @@ prompts_h = ("A Tier {0}, you say?", "Fancy a challenge, eh?",
              "Yet another Medium Demon? Crap, wrong guess.",
              "On my way to deliver a Tier {0} to you.", "so free tbh",
              "Finally trying to have a new hardest, aren't you?",
-             "Certified as Tier {0}, players approved")
+             "Certified as Tier {0}, players approved", "So you're grinding after beating Deadlocked?", "skill issue", "Your 8.2039e294th demon is:")
 # * Prompts for unrated demons
 prompts_u = (
     "A Tier... unrated? I guess that's a tier.",
@@ -92,7 +92,7 @@ prompts_u = (
     "99% of the people think ads are boring. :joy: :ok_hand:",
     "Finally getting yourself to... what? Unrated?", "so random",
     "support the GD Demon Ladder thanks",
-    "*inserts random quote about being random*")
+    "*inserts random quote about being random*", "So you're beating your first demon?", "random issues", "Your -387th demon is:")
 
 # ** Request function **
 async def request(url):
@@ -432,7 +432,7 @@ async def level(ctx, id_search, *extra):
                 else:
                     ratingtext = ""
                     for i in ratings_active:
-                        ratingtext = "".join([ratingtext, "- Tier {0} by {1}\n".format(i[0], i[1])])
+                        ratingtext = "".join([ratingtext, "- {0}{1} by {2}\n".format(tiertext_active, i[0], i[1])])
                     embed.add_field(name="Submitted ratings",
                                     value=ratingtext,
                                     inline=True)
