@@ -22,20 +22,29 @@ g!help: Shows info about commands.
 """
 
 """
+Transferring this beta build towards the host will require multiple steps:
+1) Modify prefix currently at line 62 to g!
+2) Do the same at b!ping --> g!ping near the end of the script, currently at line 1024.
+3) Comment everything regarding keep_alive, currently at lines 43 and 1031.
+4) Uncomment everything regarding dot_env, currently at lines 42 and 47. 
+"""
+
+"""
 TODO:
 [DONE] g!level: Change to show the submitted ratings in pages
-g!level: Change the fun section to fetch from a JSON file
 g!level [v], g!user, g!need(?): Add enjoyment components.
 g!rating, g!enjoy: Change the format to optimise the command
 Add g!moreinfo or whatever
-Find out why it sends too many requests
+[DONE] Find out why it sends too many requests
 """
 
 # ** Setup **
-import logging, discord, asyncio, aiohttp, json, random, os, datetime, pytz, keep_alive, math
+import logging, discord, asyncio, aiohttp, json, random, os, datetime, pytz, math#, dotenv
+import keep_alive
 from discord.ext import commands, tasks
 
 emerald_sleep = False
+#dotenv.load_dotenv()
 
 random.seed(a=os.urandom(32))  # set seed for randomness
 logging.basicConfig(level=logging.INFO)  # logging so that I see stuff
@@ -54,7 +63,7 @@ client = commands.Bot(intents=intents, command_prefix='b!', help_command=None)
 
 # * Color hex for tiers *
 tierhex = (0xBBBBBB,
-            0xDDDFEE, 0xD5D3E9, 0xD3CBE7, 0xD3C3E4, 0xD4BBE2, 0xD5B0DE, 0xDBA7DC, 0xDB9FD1, 0xD991C1, 0xDA86B0, 0xDB7698, 0xDC6A7D, 0xDD5A5A, 0xDC514C, 0xDA493E, 0xDA4535, 0xD93E26, 0xCD3F23, 0xC03A1B, 0xB23415, 0xA23010, 0x9B2B0C, 0x932B0B, 0x892608, 0x832607, 0x752105, 0x6C1E04, 0x601A02, 0x5A1802, 0x511700)
+            0xDDDFEE, 0xD5D3E9, 0xD3CBE7, 0xD3C3E4, 0xD4BBE2, 0xD5B0DE, 0xDBA7DC, 0xDB9FD1, 0xD991C1, 0xDA86B0, 0xDB7698, 0xDC6A7D, 0xDD5A5A, 0xDC514C, 0xDA493E, 0xDA4535, 0xD93E26, 0xCD3F23, 0xC03A1B, 0xB23415, 0xA23010, 0x9B2B0C, 0x932B0B, 0x892608, 0x832607, 0x752105, 0x6C1E04, 0x601A02, 0x5A1802, 0x511700, 0x351100, 0x2C0C00, 0x1F0A00, 0x1A0800, 0x000001)
             
 # * Prompts for g!need *
 # * Prompts for easier demons (Tiers 1-10)
@@ -67,7 +76,7 @@ prompts_e = ("A Tier {0}, you say?", "Grinding demons, eh?",
              "Finally pulling yourself to beat another demon, aren't you?",
              "Certified as Tier {0}, players approved",
             "So you're jumping from Bloodbath?", "so pro", "Your 62739th demon is:")
-# * Prompts for harder demons (Tiers 11-30)
+# * Prompts for harder demons (Tiers 11-35)
 prompts_h = ("A Tier {0}, you say?", "Fancy a challenge, eh?",
              "I guess one of these would be your next hardest.", "Um, go?",
              "Honestly, everyone will be amazed if you beat these.",
@@ -648,14 +657,14 @@ async def need(ctx, needtier):
                             await responsemsg.remove_reaction("🔁", ctx.author)
 
             else:
-                embed = discord.Embed(title="Enter the tier as an integer from 1 to 30!", \
+                embed = discord.Embed(title="Enter the tier as an integer from 1 to 35!", \
                 color=0xED4337)
                 await ctx.channel.send(embed=embed)
                 print(
                     'ladder> Command execution complete as tier is of incorrect syntax.'
                 )
         except:
-            embed = discord.Embed(title="Enter the tier as an integer from 1 to 30!", \
+            embed = discord.Embed(title="Enter the tier as an integer from 1 to 35!", \
             color=0xED4337)
             await ctx.channel.send(embed=embed)
             print(
