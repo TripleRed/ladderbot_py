@@ -498,7 +498,7 @@ async def need(ctx, needtier):
         # * Setup
         responsemsg = await ctx.channel.send(content="Processing...")
         needtier = int(needtier)
-        if needtier <= 0 or needtier >= 31:
+        if needtier <= 0 or needtier >= 36:
             raise Exception("Tier out of range")
 
         if needtier <= 10: etitle = prompts_e[random.randrange(len(prompts_e))]
