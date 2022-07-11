@@ -1,7 +1,7 @@
 # GD Demon Ladder Discord bot
 # Written by RFMX, (c) 2021-2022
 
-# ver 1.2-beta3
+# ver 1.2-beta4
 
 """
 This bot is written to make searching for demons easier in server.
@@ -414,7 +414,6 @@ async def level(ctx, id_search, *extra):
     
                         try:
                             reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
-                            print(reaction)
                             embed.remove_field(-1)
                             if reaction.emoji == "⬅️" and page > 0:
                                 page -= 1
@@ -453,7 +452,6 @@ async def level(ctx, id_search, *extra):
 
                     try:
                         reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
-                        print(reaction)
                         print("ladder> Switching between main and side list.")
                         await responsemsg.remove_reaction("🔁", ctx.author)
                         embed.remove_field(-1)
@@ -471,7 +469,6 @@ async def level(ctx, id_search, *extra):
 
                 try:
                     reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
-                    print(reaction)
                     print("ladder> Switching between main and side list.")
                     await responsemsg.remove_reaction("🔁", ctx.author)
                     embed.remove_field(-1)
@@ -480,7 +477,6 @@ async def level(ctx, id_search, *extra):
                 except asyncio.TimeoutError:
                     loop = False
                     print("ladder> Timeout.")
-            print(switchloop)
     else:
         embed = discord.Embed(title="There is no demon with the ID {0}!".format(id_search), \
         color=0xED4337)
@@ -490,7 +486,7 @@ async def level(ctx, id_search, *extra):
 
 # * G!NEED: Generates random demons for a specified tier, or unrated demons
 @client.command()
-async def need(ctx, needtier):
+async def need(ctx, needtier, *needextra):
     global apikey
     print('ladder> Executing command __need__ in {0}, {1} initiated by {2}'.
           format(ctx.channel, ctx.guild, ctx.author))
@@ -508,7 +504,13 @@ async def need(ctx, needtier):
         description="*If you wish to generate a new set of demons, react with :repeat:.*", \
         color=tierhex[needtier])
 
-        # * HTTP request
+        try: needenjoy = int(needextra[0])
+        except: needenjoy = 0
+        
+        # * HTTP request and check for requirements
+
+        result = []
+        
         url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'The List'!A:F?majorDimension=COLUMNS&key=" + apikey
         print(
             'ladder> Requesting to Google sheets for data at Columns A to F.')
@@ -518,7 +520,7 @@ async def need(ctx, needtier):
                 r_json = await response.text()
                 r_json = json.loads(r_json)
                 r_json = r_json['values']
-                result = []
+
                 i = 1
                 while i < len(r_json[4]):
                     result.append(i)
@@ -542,43 +544,78 @@ async def need(ctx, needtier):
                 except:
                     pass
 
-                # * Embed construction
-                await responsemsg.add_reaction("🔁")
+        url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'Side List'!A:F?majorDimension=COLUMNS&key=" + apikey
+        print(
+            'ladder> Requesting to Google sheets for data at Columns A to F.')
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                print("ladder> Status:", response.status)
+                r_json = await response.text()
+                r_json = json.loads(r_json)
+                r_json = r_json['values']
 
-                loop = True
-                while loop:  # the loop is for repeated generation of demons
-                    embed.clear_fields()
-                    if len(result) >= 5:
-                        for i in random.sample(result, 5):
-                            embed.add_field(name="{0}".format(r_json[0][i]), \
-                            value="{0}".format(r_json[4][i]), \
-                            inline=True)
-                    else:
-                        embed.add_field(name="Only {0} demons are found.".format(len(result)), \
-                            value="As such, only 1 demon is shown.", \
-                            inline=False)
-                        for i in random.sample(result, 1):
-                            embed.add_field(name="{0}".format(r_json[0][i]), \
-                            value="{0}".format(r_json[4][i]), \
-                            inline=True)
-                    await responsemsg.edit(content="", embed=embed)
+                list = []
+                try:
+                    while True:
+                        check_list = result.pop(0)
+                        try:
+                            check_try = int(r_json[5][check_list])
+                        except:
+                            check_try = 0
+                        if needenjoy <= check_try:
+                            list.append(check_list)  # comparison check
+                except:
+                    pass
+                try:
+                    while True:
+                        result.append(list.pop(0))
+                except:
+                    pass
 
-                    print(
-                        "ladder> Command execution complete with samples generated. Awaiting further response."
-                    )
+        # * Embed construction
+        loop = True
+        while loop:  # the loop is for repeated generation of demons
+            embed.clear_fields()
+            if len(result) >= 5:
+                for i in random.sample(result, 5):
+                    embed.add_field(name="{0}".format(r_json[0][i]), \
+                    value="{0}".format(r_json[4][i]), \
+                    inline=True)
+            elif len(result) >= 1:
+                embed.add_field(name="Only {0} demons are found.".format(len(result)), \
+                    value="As such, only 1 demon is shown.", \
+                    inline=False)
+                for i in random.sample(result, 1):
+                    embed.add_field(name="{0}".format(r_json[0][i]), \
+                    value="{0}".format(r_json[4][i]), \
+                    inline=True)
+            else:
+                embed = discord.Embed(title="No results are found with your settings!", \
+                color=0xED4337)
+                await responsemsg.edit(content="", embed=embed)
+                print(
+                "ladder> Command execution complete as no results are found."
+            )
+                break
+            await responsemsg.edit(content="", embed=embed)
+            await responsemsg.add_reaction("🔁")
 
-                    # * Wait for reply for 1m
-                    def check(reaction, user):
-                        return user == ctx.author and str(
-                            reaction.emoji) == "🔁"
+            print(
+                "ladder> Command execution complete with samples generated. Awaiting further response."
+            )
 
-                    try:
-                        await client.wait_for('reaction_add',
-                                              timeout=60.0,
-                                              check=check)
-                    except asyncio.TimeoutError:
-                        loop = False
-                    await responsemsg.remove_reaction("🔁", ctx.author)
+            # * Wait for reply for 1m
+            def check(reaction, user):
+                return user == ctx.author and str(
+                    reaction.emoji) == "🔁"
+
+            try:
+                await client.wait_for('reaction_add',
+                                      timeout=60.0,
+                                      check=check)
+            except asyncio.TimeoutError:
+                loop = False
+            await responsemsg.remove_reaction("🔁", ctx.author)
     except:
         try:
             # * Unrated tiers
@@ -625,48 +662,76 @@ async def need(ctx, needtier):
                         except:
                             pass
 
-                        # * Embed construction
-                        responsemsg = await ctx.channel.send(
-                            content="Processing...")
-                        await responsemsg.add_reaction("🔁")
+                url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'Side List'!A:F?majorDimension=COLUMNS&key=" + apikey
+                print(
+                    'ladder> Requesting to Google sheets for data at Columns A to F.')
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url) as response:
+                        print("ladder> Status:", response.status)
+                        r_json = await response.text()
+                        r_json = json.loads(r_json)
+                        r_json = r_json['values']
+        
+                        list = []
+                        try:
+                            while True:
+                                check_list = result.pop(0)
+                                try:
+                                    check_try = int(r_json[5][check_list])
+                                except:
+                                    check_try = 0
+                                if needenjoy <= check_try:
+                                    list.append(check_list)  # comparison check
+                        except:
+                            pass
+                        try:
+                            while True:
+                                result.append(list.pop(0))
+                        except:
+                            pass
+                        
+                # * Embed construction
+                responsemsg = await ctx.channel.send(
+                    content="Processing...")
+                await responsemsg.add_reaction("🔁")
 
-                        loop = True
-                        while loop:
-                            embed.clear_fields()
-                            for i in random.sample(result, 5):
-                                embed.add_field(name="{0}".format(r_json[0][i]), \
-                                value="{0}".format(r_json[4][i]), \
-                                inline=True)
-                            await responsemsg.edit(content="", embed=embed)
+                loop = True
+                while loop:
+                    embed.clear_fields()
+                    for i in random.sample(result, 5):
+                        embed.add_field(name="{0}".format(r_json[0][i]), \
+                        value="{0}".format(r_json[4][i]), \
+                        inline=True)
+                    await responsemsg.edit(content="", embed=embed)
 
-                            print(
-                                "ladder> Command execution complete with samples generated. Awaiting further response."
-                            )
+                    print(
+                        "ladder> Command execution complete with samples generated. Awaiting further response."
+                    )
 
-                            # * Wait for reply for 1m
-                            def check(reaction, user):
-                                return user == ctx.author and str(
-                                    reaction.emoji) == "🔁"
+                    # * Wait for reply for 1m
+                    def check(reaction, user):
+                        return user == ctx.author and str(
+                            reaction.emoji) == "🔁"
 
-                            try:
-                                await client.wait_for('reaction_add',
-                                                      timeout=60.0,
-                                                      check=check)
-                            except asyncio.TimeoutError:
-                                loop = False
-                            await responsemsg.remove_reaction("🔁", ctx.author)
+                    try:
+                        await client.wait_for('reaction_add',
+                                              timeout=60.0,
+                                              check=check)
+                    except asyncio.TimeoutError:
+                        loop = False
+                    await responsemsg.remove_reaction("🔁", ctx.author)
 
             else:
                 embed = discord.Embed(title="Enter the tier as an integer from 1 to 35!", \
                 color=0xED4337)
-                await ctx.channel.send(embed=embed)
+                await responsemsg.edit(content="", embed=embed)
                 print(
                     'ladder> Command execution complete as tier is of incorrect syntax.'
                 )
         except:
             embed = discord.Embed(title="Enter the tier as an integer from 1 to 35!", \
             color=0xED4337)
-            await ctx.channel.send(embed=embed)
+            await responsemsg.edit(content="", embed=embed)
             print(
                 'ladder> Command execution complete as tier is of incorrect syntax.'
             )
@@ -831,7 +896,6 @@ async def user(ctx, username, *args):
                 try:
                     reaction, user = await client.wait_for(
                         'reaction_add', timeout=180.0, check=check)
-                    print(reaction)
                     if reaction.emoji == "⬅️" and page > 0:
                         page -= 1
                     elif reaction.emoji == "➡️" and page < (
@@ -884,6 +948,16 @@ async def message(ctx, *, message):
           format(ctx.channel, ctx.guild, ctx.author))
     await ctx.message.delete()
     await ctx.channel.send(message)
+    print('ladder> Command execution complete.')
+
+# * G!REMOTE: GDDL Admins only, make bot talk in another channel*
+@client.command()
+@commands.is_owner()
+async def remote(ctx, channelid, *, message):
+    print('ladder> Executing command __remote__ in {0}, {1} initiated by {2}'.
+          format(ctx.channel, ctx.guild, ctx.author))
+    channel = client.get_channel(int(channelid))
+    await channel.send(message)
     print('ladder> Command execution complete.')
 
 # * G!ANNOUNCE: GDDL Admins only, make bot talk at #announcement*
@@ -947,8 +1021,8 @@ async def help(ctx, *args):
         color=0xCCFF00)
         await ctx.send(embed=embed)
     elif "need" in args:
-        embed = discord.Embed(title="g!need <tier>", \
-        description="Get 5 random levels from your specified tier! There is also an `unrated` tier!", \
+        embed = discord.Embed(title="g!need <difficulty> <enjoyment>", \
+        description="Get 5 random levels from your specified tier! There is also an `unrated` tier!\n\nIf you also fill in the enjoyment rating, only levels that has the enjoyment tier above it will be shown!", \
         color=0xCCFF00)
         await ctx.send(embed=embed)
     elif "ping" in args:
