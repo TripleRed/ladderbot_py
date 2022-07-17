@@ -162,7 +162,7 @@ async def bean(ctx, person, *reason):
     print('ladder> Command execution complete.')
 
 # * G!LEVEL: this receives a level ID then spits data about it *
-@client.command()
+@client.command(aliases=['map'])
 async def level(ctx, id_search, *extra):
     print('ladder> Executing command __level__ in {0}, {1} initiated by {2}'.
           format(ctx.channel, ctx.guild, ctx.author))  # prompt in console
@@ -209,6 +209,15 @@ async def level(ctx, id_search, *extra):
                     if id_search.lower() in r_json[i][0].lower():
                         demon_no_list.append(i)
                         demon_name_list.append(r_json[i])
+                    else:
+                        words_in_level = True
+                        for word in extra:
+                            if not word.lower() in r_json[i][0].lower():
+                                words_in_level = False
+                                break
+                        if words_in_level:
+                            demon_no_list.append(i)
+                            demon_name_list.append(r_json[i]) 
 
     # Determine type of query, and how many results are found
 
@@ -485,7 +494,7 @@ async def level(ctx, id_search, *extra):
     print('ladder> Command execution complete.')
 
 # * G!NEED: Generates random demons for a specified tier, or unrated demons
-@client.command()
+@client.command(aliases=['random'])
 async def need(ctx, needtier, *needextra):
     global apikey
     print('ladder> Executing command __need__ in {0}, {1} initiated by {2}'.
@@ -927,9 +936,9 @@ async def user(ctx, username, *args):
         print(
             'ladder> Command execution complete as an error occured.')
 
-# * G!SEND: Administrator only, sends ID to boss *
+# * G!SEND: GDDL Administrator only, sends ID to boss *
 @client.command()
-@commands.has_permissions(administrator=True)
+@commands.is_owner()
 async def send(ctx, idcall):
     print('ladder> Executing command __send__ in {0}, {1} initiated by {2}'.
           format(ctx.channel, ctx.guild, ctx.author))
@@ -969,7 +978,7 @@ async def announce(ctx, *, message):
     await channel.send(message)
     print('ladder> Command execution complete.')
 
-# * G!STATUS: Administrators only, change the status of the bot *
+# * G!STATUS: GDDL Administrators only, change the status of the bot *
 # this is just for legacy purposes, now the bot does it automatically
 @client.command()
 @commands.is_owner()
@@ -1017,12 +1026,12 @@ async def help(ctx, *args):
         await ctx.send(embed=embed)
     elif "level" in args:
         embed = discord.Embed(title="g!level <id or name>", \
-        description="Shows information about the level in the list. This includes the current tier and submitted ratings. Press the :repeat: button to switch between difficulty and enjoyment ratings!\n", \
+        description="**Aliases:** g!map\nShows information about the level in the list. This includes the current tier and submitted ratings. Press the :repeat: button to switch between difficulty and enjoyment ratings!\n", \
         color=0xCCFF00)
         await ctx.send(embed=embed)
     elif "need" in args:
         embed = discord.Embed(title="g!need <difficulty> <enjoyment>", \
-        description="Get 5 random levels from your specified tier! There is also an `unrated` tier!\n\nIf you also fill in the enjoyment rating, only levels that has the enjoyment tier above it will be shown!", \
+        description="**Aliases:** g!random\nGet 5 random levels from your specified tier! There is also an `unrated` tier!\n\nIf you also fill in the enjoyment rating, only levels that has the enjoyment tier above it will be shown!", \
         color=0xCCFF00)
         await ctx.send(embed=embed)
     elif "ping" in args:
