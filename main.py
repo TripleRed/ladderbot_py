@@ -24,15 +24,15 @@ g!help: Shows info about commands.
 """
 Transferring this beta build towards the host will require multiple steps:
 1) Modify prefix currently at line 62 to g!
-2) Do the same at b!ping --> g!ping near the end of the script, currently at line 1024.
-3) Comment everything regarding keep_alive, currently at lines 43 and 1031.
+2) Do the same at b!ping --> g!ping near the end of the script, currently at line 1107.
+3) Comment everything regarding keep_alive, currently at lines 43 and 1114.
 4) Uncomment everything regarding dot_env, currently at lines 42 and 47. 
 """
 
 """
 TODO:
 [DONE] g!level: Change to show the submitted ratings in pages
-g!level [v], g!user, g!need(?): Add enjoyment components.
+g!level [v], g!user, g!need [v]: Add enjoyment components.
 g!rating, g!enjoy: Change the format to optimise the command
 Add g!moreinfo or whatever
 [DONE] Find out why it sends too many requests
@@ -53,7 +53,7 @@ apikey = os.environ.get("APIKEY")  # Google sheets API key
 sheetid = "1Cq6TcaXZU7w8jVpgy4pYpmI76ALwQqX7Mm8itETz9wU" # sheet in use
 original_sheet = "1xaMERl70vzr8q9MqElr4YethnV15EOe8oL1UV9LLljc"
 bot_sheet = "1Cq6TcaXZU7w8jVpgy4pYpmI76ALwQqX7Mm8itETz9wU"
-gddladmins = {'439091096287707149', '556323843925475328', '374239444057849856'}
+gddladmins = {'439091096287707149', '556323843925475328', '374239444057849856', '940054294990827561'}
 
 # * Discord bot set-up *
 intents = discord.Intents.default()
@@ -424,10 +424,12 @@ async def level(ctx, id_search, *extra):
                         try:
                             reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
                             embed.remove_field(-1)
-                            if reaction.emoji == "⬅️" and page > 0:
-                                page -= 1
-                            elif reaction.emoji == "➡️" and page < (totalpages - 1):
-                                page += 1
+                            if reaction.emoji == "⬅️":
+                                if page > 0: page -= 1
+                                elif page == 0: page = totalpages - 1
+                            elif reaction.emoji == "➡️":
+                                if page < (totalpages - 1): page += 1
+                                elif page == (totalpages - 1): page = 0
                             elif reaction.emoji == "🔁":
                                 print("ladder> Switching between main and side list.")
                                 await responsemsg.remove_reaction("🔁", ctx.author)
@@ -905,11 +907,12 @@ async def user(ctx, username, *args):
                 try:
                     reaction, user = await client.wait_for(
                         'reaction_add', timeout=180.0, check=check)
-                    if reaction.emoji == "⬅️" and page > 0:
-                        page -= 1
-                    elif reaction.emoji == "➡️" and page < (
-                            totalpages - 1):
-                        page += 1
+                    if reaction.emoji == "⬅️":
+                        if page > 0: page -= 1
+                        elif page == 0: page = totalpages - 1
+                    elif reaction.emoji == "➡️":
+                        if page < (totalpages - 1): page += 1
+                        elif page == (totalpages - 1): page = 0
                 except asyncio.TimeoutError:
                     loop = False
                     print("ladder> Timeout.")
