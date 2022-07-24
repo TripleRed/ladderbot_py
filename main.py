@@ -175,6 +175,7 @@ async def level(ctx, id_search, *extra):
     # * HTTP request to check for the row no. of demon
     try:
         int(id_search)
+        assert len(extra) == 0
         id_search_type = "int"
         url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'The List'!E:E?key=" + apikey # URL construction
         print('ladder> Requesting to Google sheets for data at Column E.')
