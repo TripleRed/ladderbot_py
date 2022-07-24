@@ -1,7 +1,7 @@
 # GD Demon Ladder Discord bot
 # Written by RFMX, (c) 2021-2022
 
-# ver 1.2-beta4
+# ver 1.2-beta5
 
 """
 This bot is written to make searching for demons easier in server.
@@ -179,12 +179,7 @@ async def level(ctx, id_search, *extra):
         id_search_type = "int"
         url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'The List'!E:E?key=" + apikey # URL construction
         print('ladder> Requesting to Google sheets for data at Column E.')
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                print("ladder> Status:", response.status)
-                r_json = await response.text() # parse response
-                r_json = json.loads(r_json)
-                r_json = r_json['values']
+        r_json = await request(url)
         id_array = []
         id_array.append(id_search)
         try:
@@ -198,27 +193,22 @@ async def level(ctx, id_search, *extra):
         id_search = " ".join(extra)
         url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'The List'!A:A?key=" + apikey # URL construction
         print('ladder> Requesting to Google sheets for data at Column A.')
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                print("ladder> Status:", response.status)
-                r_json = await response.text()
-                r_json = json.loads(r_json)
-                r_json = r_json['values']
-                demon_no_list = []
-                demon_name_list = []
-                for i in range(len(r_json)) :
-                    if id_search.lower() in r_json[i][0].lower():
-                        demon_no_list.append(i)
-                        demon_name_list.append(r_json[i])
-                    else:
-                        words_in_level = True
-                        for word in extra:
-                            if not word.lower() in r_json[i][0].lower():
-                                words_in_level = False
-                                break
-                        if words_in_level:
-                            demon_no_list.append(i)
-                            demon_name_list.append(r_json[i]) 
+        r_json = await request(url)
+        demon_no_list = []
+        demon_name_list = []
+        for i in range(len(r_json)) :
+            if id_search.lower() in r_json[i][0].lower():
+                demon_no_list.append(i)
+                demon_name_list.append(r_json[i])
+            else:
+                words_in_level = True
+                for word in extra:
+                    if not word.lower() in r_json[i][0].lower():
+                        words_in_level = False
+                        break
+                if words_in_level:
+                    demon_no_list.append(i)
+                    demon_name_list.append(r_json[i]) 
 
     # Determine type of query, and how many results are found
 
@@ -238,24 +228,14 @@ async def level(ctx, id_search, *extra):
     else:
         url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'The List'!B:B?key=" + apikey # URL construction
         print('ladder> Requesting to Google sheets for data at Column B.')
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                print("ladder> Status:", response.status)
-                r_json = await response.text()
-                r_json = json.loads(r_json)
-                r_json = r_json['values']
+        r_json = await request(url)
         for i in demon_no_list:
             index = demon_no_list.index(i)
             demon_name_list[index].append(r_json[i][0])
             
         url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'The List'!E:E?key=" + apikey # URL construction
         print('ladder> Requesting to Google sheets for data at Column E.')
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                print("ladder> Status:", response.status)
-                r_json = await response.text()
-                r_json = json.loads(r_json)
-                r_json = r_json['values']
+        r_json = await request(url)
         for i in demon_no_list:
             index = demon_no_list.index(i)
             demon_name_list[index].append(r_json[i][0])
@@ -282,39 +262,34 @@ async def level(ctx, id_search, *extra):
         url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/" + row_select + "?key=" + apikey # URL cnstruction again
         print('ladder> Requesting to Google sheets for data at row {0}'.format(
             row_no))
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                print("ladder> Status:", response.status)
-                r_json = await response.text()
-                r_json = json.loads(r_json)
-                r_json = r_json['values']
-                r_json = r_json[0]
+        r_json = await request(url)
+        r_json = r_json[0]
 
-                # Now r_json is the row of the demon required, but in list form
-                # The order of the data in the list follows the order of the columns in the spreadsheet
-                # So r_json[0] means entry in Column A, selected row
+        # Now r_json is the row of the demon required, but in list form
+        # The order of the data in the list follows the order of the columns in the spreadsheet
+        # So r_json[0] means entry in Column A, selected row
                 
-                name = r_json[0]
-                id_display = r_json[4]
-                gdbrowser_url = 'https://gdbrowser.com/' + id_display
-                creator = r_json[1]
-                song = r_json[2]
-                officialdiff = r_json[3]
-                if r_json[5] != "unrated":
-                    tier = r_json[5]
-                    tier2dp = r_json[6]
-                    ratings = []
-                    i = 7
-                    try:
-                        while r_json[i] != '':
-                            ratings.append([r_json[i], r_json[i+1]])
-                            i += 2
-                    except:
-                        pass
-                else:
-                    tier = 'Unrated'
-                    tier2dp = None
-                    ratings = None
+        name = r_json[0]
+        id_display = r_json[4]
+        gdbrowser_url = 'https://gdbrowser.com/' + id_display
+        creator = r_json[1]
+        song = r_json[2]
+        officialdiff = r_json[3]
+        if r_json[5] != "unrated":
+            tier = r_json[5]
+            tier2dp = r_json[6]
+            ratings = []
+            i = 7
+            try:
+                while r_json[i] != '':
+                    ratings.append([r_json[i], r_json[i+1]])
+                    i += 2
+            except:
+                pass
+        else:
+            tier = 'Unrated'
+            tier2dp = None
+            ratings = None
 
     # * HTTP request to obtain demon info in side list
     # this code block is still under if demon_no != -1
@@ -322,29 +297,24 @@ async def level(ctx, id_search, *extra):
         url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/" + row_select + "?key=" + apikey # URL cnstruction again
         print('ladder> Requesting to Google sheets for SIDE list data at row {0}'.format(
             row_no))
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                print("ladder> Status:", response.status)
-                r_json = await response.text()
-                r_json = json.loads(r_json)
-                r_json = r_json['values']
-                r_json = r_json[0]
+        r_json = await request(url)
+        r_json = r_json[0]
 
-                if r_json[5] != "unrated":
-                    tier_e = r_json[5]
-                    tier2dp_e = r_json[6]
-                    ratings_e = []
-                    i = 7
-                    try:
-                        while r_json[i] != '':
-                            ratings_e.append([r_json[i], r_json[i+1]])
-                            i += 2
-                    except:
-                        pass
-                else:
-                    tier_e = 'Unrated'
-                    tier2dp_e = None
-                    ratings_e = None
+        if r_json[5] != "unrated":
+            tier_e = r_json[5]
+            tier2dp_e = r_json[6]
+            ratings_e = []
+            i = 7
+            try:
+                while r_json[i] != '':
+                    ratings_e.append([r_json[i], r_json[i+1]])
+                    i += 2
+            except:
+                pass
+        else:
+            tier_e = 'Unrated'
+            tier2dp_e = None
+            ratings_e = None
                     
     # * Constructing embed
     if demon_no != -1:
@@ -526,63 +496,53 @@ async def need(ctx, needtier, *needextra):
         url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'The List'!A:F?majorDimension=COLUMNS&key=" + apikey
         print(
             'ladder> Requesting to Google sheets for data at Columns A to F.')
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                print("ladder> Status:", response.status)
-                r_json = await response.text()
-                r_json = json.loads(r_json)
-                r_json = r_json['values']
+        r_json = await request(url)
 
-                i = 1
-                while i < len(r_json[4]):
-                    result.append(i)
-                    i += 1
+        i = 1
+        while i < len(r_json[4]):
+            result.append(i)
+            i += 1
 
-                list = []
+        list = []
+        try:
+            while True:
+                check_list = result.pop(0)
                 try:
-                    while True:
-                        check_list = result.pop(0)
-                        try:
-                            check_try = int(r_json[5][check_list])
-                        except:
-                            check_try = 0
-                        if needtier == check_try:
-                            list.append(check_list)  # comparison check
+                    check_try = int(r_json[5][check_list])
                 except:
-                    pass
-                try:
-                    while True:
-                        result.append(list.pop(0))
-                except:
-                    pass
+                    check_try = 0
+                if needtier == check_try:
+                    list.append(check_list)  # comparison check
+        except:
+            pass
+        try:
+            while True:
+                result.append(list.pop(0))
+        except:
+            pass
 
         url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'Side List'!A:F?majorDimension=COLUMNS&key=" + apikey
         print(
             'ladder> Requesting to Google sheets for data at Columns A to F.')
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                print("ladder> Status:", response.status)
-                r_json = await response.text()
-                r_json = json.loads(r_json)
-                r_json = r_json['values']
+        r_json = await request(url)
 
-                list = []
+        list = []
+        try:
+            while True:
+                check_list = result.pop(0)
                 try:
-                    while True:
-                        check_list = result.pop(0)
-                        try:
-                            check_try = int(r_json[5][check_list])
-                        except:
-                            check_try = 0
-                        if needenjoy <= check_try:
-                            list.append(check_list)  # comparison check
+                    check_try = int(r_json[5][check_list])
                 except:
-                    pass
-                try:
-                    while True:
-                        result.append(list.pop(0))
-                except:
-                    pass
+                    check_try = 0
+                if needenjoy <= check_try:
+                    list.append(check_list)  # comparison check
+        except:
+            pass
+        try:
+            while True:
+                result.append(list.pop(0))
+        except:
+            pass
 
         # * Embed construction
         loop = True
@@ -644,63 +604,53 @@ async def need(ctx, needtier, *needextra):
                 print(
                     'ladder> Requesting to Google sheets for data at Columns A to F.'
                 )
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url) as response:
-                        print("ladder> Status:", response.status)
-                        r_json = await response.text()
-                        r_json = json.loads(r_json)
-                        r_json = r_json['values']
-                        result = []
-                        i = 1
-                        while i < len(r_json[4]):
-                            result.append(i)
-                            i += 1
+                r_json = await request(url)
+                result = []
+                i = 1
+                while i < len(r_json[4]):
+                    result.append(i)
+                    i += 1
 
-                        list = []
+                list = []
+                try:
+                    while True:
+                        check_list = result.pop(0)
                         try:
-                            while True:
-                                check_list = result.pop(0)
-                                try:
-                                    check_try = str(r_json[5][check_list])
-                                except:
-                                    check_try = 0
-                                if needtier == check_try:
-                                    list.append(check_list)  # comparison check
+                            check_try = str(r_json[5][check_list])
                         except:
-                            pass
-                        try:
-                            while True:
-                                result.append(list.pop(0))
-                        except:
-                            pass
+                            check_try = 0
+                        if needtier == check_try:
+                            list.append(check_list)  # comparison check
+                except:
+                    pass
+                try:
+                    while True:
+                        result.append(list.pop(0))
+                except:
+                    pass
 
                 url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'Side List'!A:F?majorDimension=COLUMNS&key=" + apikey
                 print(
                     'ladder> Requesting to Google sheets for data at Columns A to F.')
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url) as response:
-                        print("ladder> Status:", response.status)
-                        r_json = await response.text()
-                        r_json = json.loads(r_json)
-                        r_json = r_json['values']
+                r_json = await request(url)
         
-                        list = []
+                list = []
+                try:
+                    while True:
+                        check_list = result.pop(0)
                         try:
-                            while True:
-                                check_list = result.pop(0)
-                                try:
-                                    check_try = int(r_json[5][check_list])
-                                except:
-                                    check_try = 0
-                                if needenjoy <= check_try:
-                                    list.append(check_list)  # comparison check
+                            check_try = int(r_json[5][check_list])
                         except:
-                            pass
-                        try:
-                            while True:
-                                result.append(list.pop(0))
-                        except:
-                            pass
+                            check_try = 0
+                        if needenjoy <= check_try:
+                            list.append(check_list)  # comparison check
+                except:
+                    pass
+                try:
+                    while True:
+                        result.append(list.pop(0))
+                except:
+                    pass
                         
                 # * Embed construction
                 responsemsg = await ctx.channel.send(
@@ -826,12 +776,7 @@ async def user(ctx, username, *args):
 
     url = "https://sheets.googleapis.com/v4/spreadsheets/" + sheetid + "/values/'The List'?majorDimension=ROWS&key=" + apikey
     print('ladder> Requesting to Google sheets for data of the whole sheet.')
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            print("ladder> Status:", response.status)
-            r_json = await response.text()
-            r_json = json.loads(r_json)
-            r_json = r_json['values']
+    r_json = await request(url)
 
     submissions = []
     specified_id = None
@@ -1062,10 +1007,12 @@ async def help(ctx, *args):
 
 
 # ** Looping **
+# * Reset status to g!help every 6 minutes *
 @tasks.loop(seconds=360)
 async def change_status():
     await client.change_presence(activity=discord.Game("g!help"))
 
+# * Check on main spreadsheet every 2 hours *
 @tasks.loop(seconds=7200)
 async def source_update():
     global sheetid
@@ -1073,10 +1020,12 @@ async def source_update():
     url = "https://sheets.googleapis.com/v4/spreadsheets/" + original_sheet + "/values/'The List'!E:E?majorDimension=ROWS&key=" + apikey
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
-            if response.status == "200":
+            if response.status == 200:
                 sheetid = original_sheet
+                print("ladder> Sheet returns 200. Using main sheet.")
             else:
                 sheetid = bot_sheet
+                print("ladder> Sheet not available, using fallback.")
             
     
 # ** Events **
@@ -1084,13 +1033,16 @@ async def source_update():
 async def on_ready():
     print('ladder> Logged in as {0.user}'.format(client))
     change_status.start()
+    source_update.start()
 
 @client.event
 async def on_message(message):
     global emerald_sleep
-    if message.author == client.user:
+    if message.author == client.user: # prevent bot from detecting itself
         return
 
+    # * "Emerald should sleep" *
+    
     if (message.author == client.get_user(556323843925475328) and emerald_sleep == True):
         check_time = datetime.datetime.utcnow().time()
         if check_time >= datetime.time(18,0) and check_time <= datetime.time(23,0):
@@ -1099,6 +1051,8 @@ async def on_message(message):
             await asyncio.sleep(15)
             await response_msg.delete()
 
+    # * "RFMX should sleep"
+    
     if (message.author == client.get_user(439091096287707149) and emerald_sleep == True):
         check_time = datetime.datetime.utcnow().time()
         rd = random.randint(1,100)
@@ -1107,12 +1061,15 @@ async def on_message(message):
             print('ladder> Asking RFMX to sleep.')
             await asyncio.sleep(15)
             await response_msg.delete()
+
+    # * G!PING: Pings the bot. *
+    # should have moved it upwards as a command.
     
     if message.content.startswith('b!ping'):
         print('ladder> Pinged. Responding.')
         await message.channel.send('Pong!')
     else:
-        await client.process_commands(message)
+        await client.process_commands(message) # look if it matches a command
 
 
 keep_alive.keep_alive()  # putting bot to Flask to keep it alive
