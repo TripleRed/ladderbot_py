@@ -182,10 +182,9 @@ async def level(ctx, id_search, *extra):
         r_json = await request(url)
         id_array = []
         id_array.append(id_search)
-        try:
-            demon_no = r_json.index(id_array)
-        except:
-            pass # demon_no will stay as -1
+        demon_no = r_json.index(id_array)
+        # this line may raise errors, it is intentional
+        # if demon_no does not exist, bot will try search as string
     except:
         id_search_type = "str"
         extra = list(extra)
